@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Assembly vs High-Level Languages</title>
+<style>
+:root{--ink:#12202e;--muted:#5b6b7b;--paper:#f2f5f7;--card:#fff;--line:#d5dde4;--accent:#8c1c2b;--ok:#1f6f4a;
+--asm:#8c1c2b;--c:#1d4e89;--python:#d99a1b;--javascript:#2f8f6b;--java:#6a4c93;--mono:Consolas,"Cascadia Mono",Menlo,monospace}
+@media (prefers-color-scheme:dark){:root{--ink:#e7edf2;--muted:#9fb0bf;--paper:#0f1820;--card:#17232e;--line:#2b3a47;--accent:#e0687a;--ok:#5fc596}}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 "Segoe UI",system-ui,sans-serif}
+header{padding:28px max(20px,5vw) 20px;border-bottom:1px solid var(--line)}
+h1{margin:0 0 4px;font:700 1.7rem/1.2 Georgia,"Times New Roman",serif;letter-spacing:-.01em}
+header p{margin:0;color:var(--muted);max-width:70ch}
+main{display:grid;grid-template-columns:320px 1fr;gap:24px;padding:24px max(20px,5vw);align-items:start}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:18px}
+.panel h2{font-size:1rem;margin:0 0 12px}
+label{display:block;font-size:.9rem;margin:12px 0 4px;color:var(--muted)}
+select,input[type=number]{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit}
+.lang{display:flex;align-items:center;gap:8px;margin:6px 0;color:var(--ink);font-size:1rem}
+.lang input{accent-color:var(--accent);width:16px;height:16px}
+.lang i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.lang.off{opacity:.45}
+button{font:inherit;cursor:pointer;border-radius:6px;border:1px solid var(--accent);padding:10px 14px}
+#run{width:100%;margin-top:18px;background:var(--accent);color:#fff;font-weight:600}
+#run:disabled{opacity:.6;cursor:wait}
+button.alt{background:transparent;color:var(--accent);margin-top:10px;width:100%}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--c);outline-offset:2px}
+#status{margin-top:12px;font-size:.9rem;color:var(--muted);min-height:1.4em}
+#status.err{color:var(--accent)}
+.sys{font-size:.8rem;color:var(--muted);margin-top:14px;font-family:var(--mono);word-break:break-word}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media(max-width:700px){.grid{grid-template-columns:1fr}}
+.chart{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px}
+.chart h3{margin:0 0 2px;font-size:.95rem}.chart small{color:var(--muted)}
+.chart div{position:relative;height:230px;margin-top:8px}
+.wide{margin-top:16px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:640px}
+th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}th{color:var(--muted);font-weight:600}
+td.best{color:var(--ok);font-weight:700}
+.empty{color:var(--muted);padding:40px 10px;text-align:center}
+pre{margin:6px 0 14px;padding:10px 12px;background:var(--paper);border:1px solid var(--line);border-radius:6px;overflow-x:auto;font:.82rem/1.45 var(--mono)}
+.notes{font-size:.9rem;color:var(--muted);max-width:75ch}
+</style></head>
+<body>
+<header><h1>Assembly vs high-level languages</h1>
+<p>Run the same arithmetic loop in each language and compare execution time, CPU usage, memory usage and code complexity.</p></header>
+<main>
+<section class="panel" aria-label="Benchmark settings">
+  <h2>Benchmark settings</h2>
+  <label for="op">Operation</label>
+  <select id="op"><option value="add">Addition (+)</option><option value="sub">Subtraction (−)</option><option value="mul">Multiplication (×)</option><option value="div">Division (÷)</option><option value="mod">Modulo (%)</option></select>
+  <label for="iters">Iterations per run</label>
+  <select id="iters"><option value="1000000">1 million</option><option value="10000000" selected>10 million</option><option value="50000000">50 million</option><option value="100000000">100 million</option></select>
+  <label for="runs">Number of runs (averaged)</label>
+  <input id="runs" type="number" min="1" max="30" value="5">
+  <label>Languages to compare</label><div id="langs"></div>
+  <button id="run">Run benchmark</button>
+  <button id="csv" class="alt" disabled>Download results (CSV)</button>
+  <div id="status" role="status"></div>
+  <div class="sys" id="sys"></div>
+</section>
+<section>
+  <div id="empty" class="panel empty">Choose an operation and languages, then select Run benchmark. Results appear here.</div>
+  <div id="out" hidden>
+    <div class="grid">
+      <div class="chart"><h3>Execution time</h3><small>milliseconds for the loop, lower is faster</small><div><canvas id="c_time"></canvas></div></div>
+      <div class="chart"><h3>CPU usage</h3><small>% of one core over the process lifetime</small><div><canvas id="c_cpu"></canvas></div></div>
+      <div class="chart"><h3>Memory usage</h3><small>peak MB used by the process</small><div><canvas id="c_mem"></canvas></div></div>
+      <div class="chart"><h3>Code complexity</h3><small>tokens in the operation's source code</small><div><canvas id="c_code"></canvas></div></div>
+    </div>
+    <div class="panel wide"><h2>Results</h2><table id="tbl"></table></div>
+    <div class="panel wide"><h2>Source code of the operation</h2><div id="code"></div></div>
+    <p class="notes" id="notes"></p>
+  </div>
+</section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+const COLORS={assembly:'#8c1c2b',c:'#1d4e89',python:'#d99a1b',javascript:'#2f8f6b',java:'#6a4c93'};
+let info,last=null,charts={};
+async function init(){
+  info=await (await fetch('/api/info')).json();
+  const all={assembly:'Assembly (x86-64)',c:'C (gcc -O2)',python:'Python',javascript:'JavaScript (Node)',java:'Java'};
+  $('#langs').innerHTML=Object.entries(all).map(([k,v])=>{const on=k in info.languages;
+    return `<label class="lang ${on?'':'off'}"><input type="checkbox" value="${k}" ${on?'checked':'disabled'}><i style="background:${COLORS[k]}"></i>${v}${on?'':' (not installed)'}</label>`}).join('');
+  const s=info.system;$('#sys').textContent=`${s.os} · ${s.cores} cores`;
+}
+function bar(id,labels,data,colors,unit){
+  if(charts[id])charts[id].destroy();
+  const dark=matchMedia('(prefers-color-scheme:dark)').matches,tc=dark?'#9fb0bf':'#5b6b7b';
+  charts[id]=new Chart($('#'+id),{type:'bar',data:{labels,datasets:[{data,backgroundColor:colors,borderRadius:4}]},
+   options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y.toLocaleString(undefined,{maximumFractionDigits:2})+' '+unit}}},
+   scales:{x:{ticks:{color:tc},grid:{display:false}},y:{beginAtZero:true,ticks:{color:tc},grid:{color:dark?'#2b3a47':'#e3e8ed'}}}}});
+}
+async function run(){
+  const langs=[...document.querySelectorAll('#langs input:checked')].map(i=>i.value);
+  const st=$('#status');st.className='';
+  if(!langs.length){st.textContent='Select at least one language.';st.className='err';return}
+  $('#run').disabled=true;st.textContent='Running… this can take a while for large runs.';
+  try{
+    const r=await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({operation:$('#op').value,iterations:+$('#iters').value,runs:+$('#runs').value,languages:langs})});
+    const d=await r.json();if(!r.ok)throw new Error(d.error||'Request failed');
+    last=d;show(d);st.textContent='Done.';$('#csv').disabled=false;
+  }catch(e){st.textContent=e.message;st.className='err'}
+  $('#run').disabled=false;
+}
+function show(d){
+  $('#empty').hidden=true;$('#out').hidden=false;
+  const ok=Object.entries(d.results).filter(([,v])=>!v.error),keys=ok.map(([k])=>k),labels=ok.map(([,v])=>v.label),cols=keys.map(k=>COLORS[k]);
+  bar('c_time',labels,ok.map(([,v])=>v.time_ms),cols,'ms');
+  bar('c_cpu',labels,ok.map(([,v])=>v.cpu_pct),cols,'%');
+  bar('c_mem',labels,ok.map(([,v])=>v.mem_mb),cols,'MB');
+  bar('c_code',labels,ok.map(([,v])=>v.tokens),cols,'tokens');
+  const base=d.results.assembly&&!d.results.assembly.error?d.results.assembly:ok.map(([,v])=>v).sort((a,b)=>a.time_ms-b.time_ms)[0];
+  const fastest=Math.min(...ok.map(([,v])=>v.time_ms));
+  const f=(x,n=2)=>x.toLocaleString(undefined,{maximumFractionDigits:n});
+  let h='<tr><th>Language</th><th>Time (ms)</th><th>± SD</th><th>ns / op</th><th>vs Assembly</th><th>CPU %</th><th>Memory (MB)</th><th>Lines</th><th>Tokens</th></tr>';
+  for(const [k,v] of Object.entries(d.results)){
+    if(v.error){h+=`<tr><td>${v.label}</td><td colspan="8" style="text-align:left;color:var(--accent)">${v.error}</td></tr>`;continue}
+    h+=`<tr><td>${v.label}</td><td class="${v.time_ms===fastest?'best':''}">${f(v.time_ms)}</td><td>${f(v.time_sd)}</td><td>${f(v.ns_per_op,3)}</td><td>${f(v.time_ms/base.time_ms)}×</td><td>${f(v.cpu_pct,1)}</td><td>${f(v.mem_mb,1)}</td><td>${v.loc}</td><td>${v.tokens}</td></tr>`}
+  $('#tbl').innerHTML=h;
+  $('#code').innerHTML=keys.map(k=>`<b>${d.results[k].label}</b><pre>${info.snippets[k][d.operation].replace(/</g,'&lt;')}</pre>`).join('');
+  $('#notes').textContent=`${f(d.iterations,0)} iterations × ${d.runs} runs, averaged. The loop time excludes process start-up; CPU and memory are measured for the whole process, so they include each language's runtime (interpreter or JIT). Compare against the assembly baseline, and read why the numbers differ before drawing conclusions.`;
+}
+function csv(){
+  if(!last)return;const rows=[['language','operation','iterations','runs','time_ms_mean','time_ms_sd','ns_per_op','cpu_percent','memory_mb','code_lines','code_tokens']];
+  for(const [k,v] of Object.entries(last.results))if(!v.error)rows.push([k,last.operation,last.iterations,last.runs,v.time_ms,v.time_sd,v.ns_per_op,v.cpu_pct,v.mem_mb,v.loc,v.tokens]);
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([rows.map(r=>r.join(',')).join('\n')],{type:'text/csv'}));
+  a.download=`benchmark_${last.operation}.csv`;a.click();
+}
+$('#run').onclick=run;$('#csv').onclick=csv;init();
+</script></body></html>
