@@ -12,7 +12,7 @@ then charts **execution time, CPU usage, memory usage and code complexity**.
     python app.py
 Open http://127.0.0.1:5000 , pick an operation and languages, click **Run benchmark**. Internet is needed once per page load for the chart library.
 
-## Notes for your paper
+## Notes:
 - Assembly is x86-64 inline assembly (GCC syntax). It will not build on ARM (Apple Silicon, Raspberry Pi); use an Intel/AMD PC.
 - Execution time = the timed loop only, after a warm-up run. CPU % and memory = whole process (psutil), so runtimes count.
 - Code complexity = lines and tokens of the operation's source (assembly takes more code, especially for division).
